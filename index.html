@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Realtime ECG Health Check (p5.js)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>Realtime ECG Health Check <span class="badge">p5.js</span></h1>
+    </header>
+
+    <!-- Master Controls -->
+    <div class="panel" style="margin-bottom: 12px;">
+      <div class="btnrow" style="justify-content: space-between;">
+        <div>
+          <span>Status: <strong id="masterStatus">paused</strong></span>
+        </div>
+        <div>
+          <button id="masterToggle">⏯️ Start / Pause All</button>
+          <button id="masterReset">🔄 Reset All</button>
+          <button id="masterDrift">⚠️ Drift: OFF</button>
+          <button id="masterLead">🔌 Lead-Off: OFF</button>
+          <button id="masterMark">📍 Mark Event All</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="cards">
+      <section class="ecg-card">
+        <div class="panel" style="padding: 8px;">
+          <div class="legend" style="margin-bottom:6px;">
+            <span class="dot r"></span> R-peak
+            <span class="dot ste"></span> ST Elevation
+            <span class="dot std"></span> ST Depression
+            <span class="dot mark"></span> Marked Event
+            <span class="pill severityPill">ECG 1: NORMAL</span>
+          </div>
+          <div class="canvasHost"></div>
+        </div>
+      </section>
+
+      <section class="ecg-card">
+        <div class="panel" style="padding: 8px;">
+          <div class="legend" style="margin-bottom:6px;">
+            <span class="dot r"></span> R-peak
+            <span class="dot ste"></span> ST Elevation
+            <span class="dot std"></span> ST Depression
+            <span class="dot mark"></span> Marked Event
+            <span class="pill severityPill">ECG 2: NORMAL</span>
+          </div>
+          <div class="canvasHost"></div>
+        </div>
+      </section>
+
+      <section class="ecg-card">
+        <div class="panel" style="padding: 8px;">
+          <div class="legend" style="margin-bottom:6px;">
+            <span class="dot r"></span> R-peak
+            <span class="dot ste"></span> ST Elevation
+            <span class="dot std"></span> ST Depression
+            <span class="dot mark"></span> Marked Event
+            <span class="pill severityPill">ECG 3: NORMAL</span>
+          </div>
+          <div class="canvasHost"></div>
+        </div>
+      </section>
+
+      <section class="ecg-card">
+        <div class="panel" style="padding: 8px;">
+          <div class="legend" style="margin-bottom:6px;">
+            <span class="dot r"></span> R-peak
+            <span class="dot ste"></span> ST Elevation
+            <span class="dot std"></span> ST Depression
+            <span class="dot mark"></span> Marked Event
+            <span class="pill severityPill">ECG 4: NORMAL</span>
+          </div>
+          <div class="canvasHost"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Export Section -->
+    <div class="panel" style="margin-top: 12px;">
+      <h3 style="margin:4px 0 8px;">Export Data</h3>
+      <div class="export-section">
+        <div class="export-info">
+          <span>Total Events: <strong id="eventCount">0</strong></span>
+          <span>Total Alerts: <strong id="alertCount">0</strong></span>
+        </div>
+        <div class="export-buttons">
+          <button id="exportCSV">📄 Download CSV</button>
+          <button id="exportJSON">📋 Download JSON</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="ecg-simulator.js"></script>
+</body>
+</html> 
