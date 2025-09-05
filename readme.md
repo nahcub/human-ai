@@ -1,15 +1,30 @@
+# ECG Simulation Tool
 
+## Overview
+This tool simulates ECG signals with various scenarios for analysis and alert testing.
 
-site3 이잘되긴함
+## Features
+- **Start/Pause**: Control the simulation.
+- **Drift**: Introduces irregular RR intervals to simulate arrhythmia scenarios.
+- **Lead-Off**: Simulates sensor detachment, resulting in flatline + noise.
+- **Analysis & Alerts Panel**: Displays
+  - Average HR  
+  - RR Coefficient of Variation (CV)  
+  - ST Status  
+  - Signal Quality (SQI)  
+  - Lead Status  
+  - Recent Alerts
 
-간단 사용법:
+- **Mark Event**: Tag the moment of perceived symptoms. A vertical line will appear on the waveform, and an entry will be logged.
 
-Start/Pause로 시뮬레이션을 제어합니다.
+## Usage
+1. Launch the simulation.
+2. Use the **Start/Pause** button to begin or stop.  
+3. Toggle **Drift** or **Lead-Off** to simulate abnormal conditions.  
+4. Monitor real-time data and alerts on the right panel.  
+5. Use **Mark Event** to record symptom occurrences for later analysis.
 
-Drift를 켜면 불규칙 RR(부정맥 유발) 시나리오가 섞입니다.
-
-Lead-Off를 켜면 센서 분리(평탄 + 잡음) 상태가 재현됩니다.
-
-우측 Analysis & Alerts 패널에서 평균 HR, RR 변동계수(CV), ST 상태, 신호 품질(SQI), 리드 상태와 최근 경고를 확인할 수 있습니다.
-
-📍 Mark Event로 자각 증상 시점을 태깅하면 파형에 세로선과 로그가 남습니다.# human-ai
+## Notes
+- Designed for human–AI collaborative testing.  
+- Supports arrhythmia and sensor error simulation.  
+- Logs and waveform annotations enable detailed post-analysis.  

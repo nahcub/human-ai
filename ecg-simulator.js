@@ -14,33 +14,8 @@
   const simulators = [];
   const combinedAlerts = [];
   
-  // Comprehensive event logging - only for significant events
-  const eventLog = [];
-  let sessionStartTime = Date.now();
-
   // Track drift state for each ECG channel to prevent duplicate logging
   const driftStates = [false, false, false, false]; // false = normal, true = drifting
-
-  function logDetailedEvent(ecgIndex, eventType, data = {}) {
-    const timestamp = Date.now();
-    const relativeTime = (timestamp - sessionStartTime) / 1000; // seconds since session start
-    
-    const event = {
-      timestamp: new Date(timestamp).toISOString(),
-      relativeTime: relativeTime.toFixed(3),
-      ecgChannel: ecgIndex + 1,
-      eventType: eventType,
-      data: data,
-      sessionId: sessionStartTime
-    };
-    
-    eventLog.push(event);
-    
-    // Keep memory usage reasonable
-    if (eventLog.length > 10000) {
-      eventLog.shift();
-    }
-  }
 
   function addECGPulseEffect(ecgIndex, severity) {
     const ecgCards = document.querySelectorAll('.ecg-card');
@@ -138,21 +113,6 @@
       
       // Add pulse effect to ECG card
       addECGPulseEffect(ecgIndex, lvl);
-      
-      // Log detailed alert event (only abnormal events)
-      logDetailedEvent(ecgIndex, 'ALERT', {
-        message: msg,
-        severity: lvl === 1 ? 'WARNING' : 'DANGER',
-        simulationTime: t
-      });
-    }
-    
-    function logEvent(text){ 
-      // Log detailed event (only abnormal events)
-      logDetailedEvent(ecgIndex, 'EVENT', {
-        description: text,
-        simulationTime: t
-      });
     }
 
     function evaluateBeat(rIdx){
@@ -168,29 +128,10 @@
         if (diff > globalUI.stTh){ 
           stEvents.push({idx:rIdx, type:'elev'}); 
           addAlert(`ST Elevation detected (Δ≈${diff.toFixed(2)})`, 2); 
-          logEvent('ST Elevation');
-          
-          // Log only ST abnormalities
-          logDetailedEvent(ecgIndex, 'ST_ABNORMAL', {
-            type: 'ST_ELEVATION',
-            sampleIndex: rIdx,
-            simulationTime: t,
-            stValue: diff
-          });
         } else if (diff < -globalUI.stTh){ 
           stEvents.push({idx:rIdx, type:'depr'}); 
           addAlert(`ST Depression detected (Δ≈${diff.toFixed(2)})`, 2); 
-          logEvent('ST Depression');
-          
-          // Log only ST abnormalities
-          logDetailedEvent(ecgIndex, 'ST_ABNORMAL', {
-            type: 'ST_DEPRESSION',
-            sampleIndex: rIdx,
-            simulationTime: t,
-            stValue: diff
-          });
         }
-        // Don't log normal R-peaks
         if (stEvents.length>80) stEvents.shift();
       }
     }
@@ -222,30 +163,13 @@
       const stWin = stEvents.filter(e=> e.idx>=minIdx);
       let stState='Normal'; if (stWin.some(e=>e.type==='elev')) stState='Elevation'; else if (stWin.some(e=>e.type==='depr')) stState='Depression';
       
-      if (brady) { addAlert(`Bradycardia (avg ~${avgHR.toFixed(0)} bpm)`, 1); logEvent('Bradycardia'); }
-      if (tachy) { addAlert(`Tachycardia (avg ~${avgHR.toFixed(0)} bpm)`, 1); logEvent('Tachycardia'); }
-      if (afib)  { addAlert(`Irregular rhythm (AFib-suspect: CV ${cv.toFixed(2)})`, 2); logEvent('AFib-suspect'); }
+      if (brady) { addAlert(`Bradycardia (avg ~${avgHR.toFixed(0)} bpm)`, 1); }
+      if (tachy) { addAlert(`Tachycardia (avg ~${avgHR.toFixed(0)} bpm)`, 1); }
+      if (afib)  { addAlert(`Irregular rhythm (AFib-suspect: CV ${cv.toFixed(2)})`, 2); }
       
       let lvl=0; if (stState!=='Normal' || afib) lvl=2; else if (brady||tachy) lvl=1;
-      const {qual, score} = estimateSignalQuality();
       if (globalLeadOff) lvl = Math.max(lvl, 2);
       severity.level = lvl;
-      
-      // Check if we should log rhythm abnormalities
-      if (brady || tachy || afib || stState !== 'Normal' || qual === 'Poor') {
-        logDetailedEvent(ecgIndex, 'RHYTHM_ABNORMAL', {
-          heartRate: avgHR,
-          hrVariability: cv,
-          signalQuality: qual,
-          signalScore: score,
-          stState: stState,
-          bradycardia: brady,
-          tachycardia: tachy,
-          irregularRhythm: afib,
-          severityLevel: lvl,
-          simulationTime: t
-        });
-      }
       
       // Update ECG border color based on severity
       updateECGBorderColor(ecgIndex, lvl);
@@ -267,23 +191,11 @@
       
       // Reset border color to normal
       updateECGBorderColor(ecgIndex, 0);
-      
-      logDetailedEvent(ecgIndex, 'SYSTEM', {
-        action: 'RESET',
-        simulationTime: t
-      });
     }
 
     // Mark event function for this simulator
     function markEvent(){
       userMarks.push({idx: sampleIndex});
-      logEvent('User mark');
-      
-      logDetailedEvent(ecgIndex, 'USER_ACTION', {
-        action: 'MARK_EVENT',
-        sampleIndex: sampleIndex,
-        simulationTime: t
-      });
     }
 
     // p5 instance
@@ -309,7 +221,6 @@
 
       function drawBackground(){
         p.background('#081020');
-        // Border color is now handled in evaluateRhythm
       }
 
       function drawSignal(){
@@ -348,27 +259,11 @@
               // Only log drift event if this channel wasn't already drifting
               if (!driftStates[ecgIndex]) {
                 driftStates[ecgIndex] = true; // Mark as drifting
-                
-                logDetailedEvent(ecgIndex, 'DRIFT_EVENT', {
-                  phaseShift: phaseShift,
-                  simulationTime: t,
-                  driftEnabled: globalDriftOn,
-                  currentPhase: phase,
-                  driftState: 'STARTED'
-                });
               }
             } else {
               // Check if drift has ended (no drift for a while)
               if (driftStates[ecgIndex] && Math.random() < 0.001) { // Lower probability for drift end
                 driftStates[ecgIndex] = false; // Mark as normal
-                
-                logDetailedEvent(ecgIndex, 'DRIFT_EVENT', {
-                  phaseShift: 0,
-                  simulationTime: t,
-                  driftEnabled: globalDriftOn,
-                  currentPhase: phase,
-                  driftState: 'ENDED'
-                });
               }
             }
             
@@ -388,117 +283,14 @@
     return { reset, markEvent };
   }
 
-  function updateEventCounts(){
-    document.getElementById('eventCount').textContent = eventLog.length;
-    document.getElementById('alertCount').textContent = combinedAlerts.length;
-  }
-
-  function exportToCSV(){
-    const headers = [
-      'Timestamp',
-      'Relative Time (s)',
-      'ECG Channel',
-      'Event Type',
-      'Message/Description',
-      'Severity',
-      'Heart Rate',
-      'HRV',
-      'Signal Quality',
-      'ST State',
-      'Sample Index',
-      'Simulation Time',
-      'Additional Data'
-    ];
-    
-    const rows = eventLog.map(event => {
-      const data = event.data || {};
-      return [
-        event.timestamp,
-        event.relativeTime,
-        event.ecgChannel,
-        event.eventType,
-        data.message || data.description || data.action || data.type || '',
-        data.severity || '',
-        data.heartRate || '',
-        data.hrVariability || '',
-        data.signalQuality || '',
-        data.stState || '',
-        data.sampleIndex || '',
-        data.simulationTime || '',
-        JSON.stringify(data)
-      ];
-    });
-    
-    const csvContent = [headers, ...rows]
-      .map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
-      .join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `ecg_drift_log_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-
-  function exportToJSON(){
-    const exportData = {
-      sessionInfo: {
-        sessionId: sessionStartTime,
-        sessionStart: new Date(sessionStartTime).toISOString(),
-        exportTime: new Date().toISOString(),
-        totalEvents: eventLog.length,
-        totalAlerts: combinedAlerts.length,
-        driftEventsOnly: true
-      },
-      configuration: globalUI,
-      events: eventLog,
-      summary: {
-        eventTypes: [...new Set(eventLog.map(e => e.eventType))],
-        channelsActive: [...new Set(eventLog.map(e => e.ecgChannel))],
-        driftEventCount: eventLog.filter(e => e.eventType === 'DRIFT_EVENT').length,
-        firstEvent: eventLog.length > 0 ? eventLog[0].timestamp : null,
-        lastEvent: eventLog.length > 0 ? eventLog[eventLog.length - 1].timestamp : null
-      }
-    };
-    
-    const jsonContent = JSON.stringify(exportData, null, 2);
-    const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `ecg_drift_log_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.json`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }
-
   // Master control functions
   function updateMasterStatus(){
     document.getElementById('masterStatus').textContent = globalRunning ? 'running' : 'paused';
-    document.getElementById('masterDrift').textContent = (globalDriftOn ? '⚠️ Drift: ON' : '⚠️ Drift: OFF');
-    document.getElementById('masterLead').textContent = (globalLeadOff ? '🔌 Lead-Off: ON' : '🔌 Lead-Off: OFF');
-    
-    // Log system state changes
-    logDetailedEvent(-1, 'SYSTEM', {
-      action: globalRunning ? 'START' : 'PAUSE',
-      driftMode: globalDriftOn,
-      leadOffMode: globalLeadOff,
-      configuration: {...globalUI}
-    });
+    document.getElementById('masterDrift').textContent = (globalDriftOn ? ' Drift: ON' : ' Drift: OFF');
+    document.getElementById('masterLead').textContent = (globalLeadOff ? ' Lead-Off: ON' : ' Lead-Off: OFF');
   }
 
   document.addEventListener('DOMContentLoaded', ()=>{
-    // Initialize session
-    logDetailedEvent(-1, 'SYSTEM', {
-      action: 'SESSION_START',
-      configuration: {...globalUI}
-    });
-
     // Create all simulators
     document.querySelectorAll('.ecg-card').forEach((root, index)=> {
       const sim = createECGSimulator(root, index);
@@ -517,15 +309,6 @@
     document.getElementById('masterDrift').addEventListener('click', ()=>{ globalDriftOn=!globalDriftOn; updateMasterStatus(); });
     document.getElementById('masterLead').addEventListener('click', ()=>{ globalLeadOff=!globalLeadOff; updateMasterStatus(); });
     document.getElementById('masterMark').addEventListener('click', ()=>{ simulators.forEach(sim=>sim.markEvent()); });
-
-    // Wire export buttons
-    document.getElementById('exportCSV').addEventListener('click', exportToCSV);
-    document.getElementById('exportJSON').addEventListener('click', exportToJSON);
-
-    // Update event counts periodically
-    setInterval(()=>{
-      updateEventCounts();
-    }, 1000);
 
     updateMasterStatus();
   });
