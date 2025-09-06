@@ -154,10 +154,12 @@
       const recentRR = []; for (let i=1;i<recentR.length;i++){ recentRR.push((recentR[i]-recentR[i-1])/SR); }
       const mRR = mean(recentRR);
       const avgHR = mRR>0 ? 60/mRR : 0;
+      const hrv = (mRR > 0 && recentRR.length >= 3) ? std(recentRR) * 1000 : 0;
       const cv = (mRR>0 && recentRR.length>=3) ? (std(recentRR)/mRR) : 0;
       let brady=false, tachy=false, afib=false;
       if (avgHR>0 && avgHR<globalUI.brady) brady=true;
       if (avgHR>0 && avgHR>globalUI.tachy) tachy=true;
+      if (hrv > globalUI.cvTh && recentRR.length >= 5) afib = true;      
       if (cv>globalUI.cvTh && recentRR.length>=5) afib=true;
       
       const stWin = stEvents.filter(e=> e.idx>=minIdx);
@@ -179,6 +181,28 @@
       if (lvl===0){ pill.textContent=`ECG ${ecgIndex+1}: NORMAL`; pill.style.color='#9bffc7'; pill.style.border='1px solid #2a705e'; pill.style.background='#0e1f22'; }
       if (lvl===1){ pill.textContent=`ECG ${ecgIndex+1}: WARNING`; pill.style.color='#ffd166'; pill.style.border='1px solid #7a6139'; pill.style.background='#211a0e'; }
       if (lvl===2){ pill.textContent=`ECG ${ecgIndex+1}: DANGER`; pill.style.color='#ff8b94'; pill.style.border='1px solid #7a3946'; pill.style.background='#211013'; }
+
+      console.log(`ECG ${ecgIndex+1} - avgHR: ${avgHR.toFixed(2)} bpm, HRV: ${cv.toFixed(2)}, ST: ${stState}, Severity: ${lvl}`);
+      // Send data to AetherSense API
+      if (avgHR > 0 && cv > 0) {
+        const payload = {
+          user_id: "simulator-user-123", // A placeholder ID
+          breath_rate: avgHR,
+          hrv: cv,
+          text: `ECG ${ecgIndex + 1}: avgHR=${avgHR.toFixed(2)}, HRV=${hrv.toFixed(2)}`
+        };
+
+        fetch(`${AETHER_SENSE_URL}/breath-check-in`, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(data => console.log('Success:', data))
+        .catch((error) => console.error('Error:', error));  
+      }     
     }
 
     // Reset function for this simulator
@@ -271,10 +295,10 @@
             let y = ecgTemplate(phase); y += baselineWander(t); y += globalUI.noise * randomGaussian() * 0.1; pushSample(y); t+=dt;
             if (lastPhase<0.40 && phase>=0.40){ const rIdx = sampleIndex-1; rPeaks.push(rIdx); if (rPeaks.length>300) rPeaks.shift(); evaluateBeat(rIdx); }
           }
+          if (p.frameCount % Math.max(1, Math.floor(FPS/5)) === 0){ evaluateRhythm(); }
         }
         drawBackground();
         drawSignal();
-        if (p.frameCount % Math.max(1, Math.floor(FPS/5)) === 0){ evaluateRhythm(); }
       };
     };
 

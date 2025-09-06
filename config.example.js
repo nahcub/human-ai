@@ -1,0 +1,1 @@
+const AETHER_SENSE_URL="URL/Domain of backend server";
