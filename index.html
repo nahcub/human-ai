@@ -22,6 +22,7 @@
         <div>
           <button id="masterToggle">⏯️ Start / Pause All</button>
           <button id="masterReset">🔄 Reset All</button>
+          <button id="connectFitbit">🔗 Connect to Fitbit</button>
           <button id="masterDrift">⚠️ Drift: OFF</button>
           <button id="masterLead">🔌 Lead-Off: OFF</button>
           <button id="masterMark">📍 Mark Event All</button>
@@ -56,14 +57,10 @@
         </div>
       </section>
 
-      <section class="ecg-card">
+      <section class="ecg-card" id="fitbit-hrv-card">
         <div class="panel" style="padding: 8px;">
           <div class="legend" style="margin-bottom:6px;">
-            <span class="dot r"></span> R-peak
-            <span class="dot ste"></span> ST Elevation
-            <span class="dot std"></span> ST Depression
-            <span class="dot mark"></span> Marked Event
-            <span class="pill severityPill">ECG 3: NORMAL</span>
+            <span class="pill severityPill">FITBIT HRV: NORMAL</span>
           </div>
           <div class="canvasHost"></div>
         </div>
