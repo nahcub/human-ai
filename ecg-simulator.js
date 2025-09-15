@@ -13,7 +13,6 @@
 
   const simulators = [];
   const combinedAlerts = [];
-  let fitbitIntervalId = null;
   
   // Track drift state for each ECG channel to prevent duplicate logging
   const driftStates = [false, false, false, false]; // false = normal, true = drifting
@@ -64,8 +63,6 @@
   }
 
   function createECGSimulator(root, ecgIndex){
-    // Detect if this is the Fitbit HRV card
-    const isFitbitCard = root.id === 'fitbit-hrv-card';
     // State per instance - but controlled globally
     const severity = { level: 0 };
 
@@ -107,7 +104,6 @@
     function getSampleAt(idx){ const i = idx - bufferStartIndex; if (i<0 || i>=buffer.length) return null; return buffer[i]; }
 
     function addAlert(msg, lvl=1){ 
-      if (isFitbitCard) return; // Do not add alerts for Fitbit card
       const timeStr = t.toFixed(1) + 's'; 
       const alertObj = {msg:`[ECG ${ecgIndex+1}] [${timeStr}] ${msg}`, lvl, ecg: ecgIndex+1, time: t};
       alerts.push(alertObj);
@@ -153,7 +149,6 @@
     }
 
     function evaluateRhythm(){
-      if (isFitbitCard) return; // Skip ECG logic for Fitbit card
       const windowSec=10; const minIdx = sampleIndex - windowSec*SR;
       const recentR = rPeaks.filter(idx=> idx>=minIdx);
       const recentRR = []; for (let i=1;i<recentR.length;i++){ recentRR.push((recentR[i]-recentR[i-1])/SR); }
@@ -187,6 +182,7 @@
       if (lvl===1){ pill.textContent=`ECG ${ecgIndex+1}: WARNING`; pill.style.color='#ffd166'; pill.style.border='1px solid #7a6139'; pill.style.background='#211a0e'; }
       if (lvl===2){ pill.textContent=`ECG ${ecgIndex+1}: DANGER`; pill.style.color='#ff8b94'; pill.style.border='1px solid #7a3946'; pill.style.background='#211013'; }
 
+      console.log(`ECG ${ecgIndex+1} - avgHR: ${avgHR.toFixed(2)} bpm, HRV: ${cv.toFixed(2)}, ST: ${stState}, Severity: ${lvl}`);
       // Send data to AetherSense API
       if (avgHR > 0 && cv > 0) {
         const payload = {
@@ -273,7 +269,7 @@
       }
 
       p.draw = function(){
-        if (!isFitbitCard && globalRunning){
+        if (globalRunning){
           for (let k=0; k<SAMPLES_PER_FRAME; k++){
             const dt = 1.0/SR;
             if (globalLeadOff){ const y = 0 + globalUI.noise * randomGaussian() * 0.2; pushSample(y); t+=dt; continue; }
@@ -308,8 +304,7 @@
 
     new p5(sketch, refs.canvasHost);
 
-    // Expose pushSample for Fitbit HRV visual update
-    return { reset, markEvent, pushSample };
+    return { reset, markEvent };
   }
 
   // Master control functions
@@ -326,130 +321,8 @@
       simulators.push(sim);
     });
 
-    const checkFitbitStatus = async () => {
-      const connectBtn = document.getElementById('connectFitbit');
-      const urlParams = new URLSearchParams(window.location.search);
-      const redirectStatus = urlParams.get('fitbit_status');
-
-      // --- Step 1: Handle immediate redirect from Fitbit ---
-      if (redirectStatus) {
-        if (redirectStatus === 'success') {
-          // Immediately update the UI for a good user experience
-          connectBtn.textContent = '✅ Fitbit Connected';
-          connectBtn.disabled = true;
-          connectBtn.style.cursor = 'default';
-          connectBtn.style.borderColor = '#53d1b6';
-        } else if (redirectStatus.startsWith('error')) {
-          alert("Failed to connect to Fitbit. Please try again.");
-        }
-        // Clean the URL to prevent re-triggering this on refresh
-        window.history.replaceState({}, document.title, window.location.pathname);
-        return; // Exit after handling the redirect
-      }
-
-      try {
-        const response = await fetch(AETHER_SENSE_URL + '/fitbit/status', {
-          credentials: 'include'
-        });
-        const data = await response.json();
-        
-        if (data.status === 'connected') {
-          connectBtn.textContent = '✅ Fitbit Connected';
-          connectBtn.disabled = true;
-          connectBtn.style.cursor = 'default';
-        } else {
-          connectBtn.textContent = '🔗 Connect to Fitbit';
-          connectBtn.disabled = false;
-        }
-      } catch (error) {
-        console.error("Could not check Fitbit status:", error);
-        // Keep the button in its default "Connect" state if the backend is down
-        connectBtn.textContent = '🔗 Connect to Fitbit';
-        connectBtn.disabled = false;
-      }
-    };
-
-    // Call the function when the page loads
-    checkFitbitStatus();
-
     // Wire master controls (buttons only)
-    document.getElementById('masterToggle').addEventListener('click', ()=>{
-      globalRunning = !globalRunning;
-      if (globalRunning) {
-        // Start the ECG simulation
-        console.log("Starting ECG simulation and Fitbit data fetch.");
-
-        // Function to fetch and log Fitbit data
-        const fetchAndLogFitbitData = () => {
-          fetch(AETHER_SENSE_URL + '/fitbit/get-live-hrv', {
-            method: 'GET',
-            credentials: 'include'
-          })
-          .then(response => {
-            if (!response.ok) {
-              console.warn("Fitbit token might be expired or invalid. Please reconnect.");
-              return null;
-            }
-            return response.json();
-          })
-          .then(data => {
-            if (data && data.status === "success" && data.data.length > 0) {
-              console.log('Successfully fetched Fitbit HRV data:', data.data);
-
-              // 1. Transform the data for the backend
-              const transformedData = data.data.map(entry => ({
-                timestamp: entry.timestamp,
-                signal: 'hrv', // Use a unique signal name for Fitbit data
-                value: entry.hrv_value,
-                unit: 'ms', // HRV is typically in milliseconds
-                meta: { source: 'fitbit' }
-              }));
-
-              // 2. POST the transformed data to the backend's upload endpoint
-              fetch(AETHER_SENSE_URL + '/ecg/upload', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(transformedData)
-              })
-              .then(uploadResponse => {
-                if (!uploadResponse.ok) {
-                  return uploadResponse.json().then(err => { throw err; });
-                }
-                return uploadResponse.json();
-              })
-              .then(uploadResult => {
-                console.log('Successfully logged Fitbit data to backend:', uploadResult);
-              })
-              .catch(error => {
-                console.error('Error logging Fitbit data to backend:', error);
-              });
-
-              // 3. Update the dedicated Fitbit chart on the UI
-              updateFitbitVisuals(data.data);
-
-            } else {
-              console.log('No new Fitbit data or an error occurred.');
-            }
-          })
-          .catch(error => {
-            console.error('Error fetching Fitbit data:', error);
-          });
-        };
-
-        // Fetch immediately and then start the interval
-        fetchAndLogFitbitData();
-        fitbitIntervalId = setInterval(fetchAndLogFitbitData, 600); // Fetch every 60 seconds
-
-      } else {
-        console.log("Pausing ECG simulation and Fitbit data fetch.");
-        // Stop fetching Fitbit data
-        if (fitbitIntervalId) {
-          clearInterval(fitbitIntervalId);
-          fitbitIntervalId = null;
-        }
-      }
-      updateMasterStatus();
-    });
+    document.getElementById('masterToggle').addEventListener('click', ()=>{ globalRunning=!globalRunning; updateMasterStatus(); });
     document.getElementById('masterReset').addEventListener('click', ()=>{ 
       simulators.forEach(sim=>sim.reset()); 
       combinedAlerts.length = 0;
@@ -460,33 +333,7 @@
     document.getElementById('masterDrift').addEventListener('click', ()=>{ globalDriftOn=!globalDriftOn; updateMasterStatus(); });
     document.getElementById('masterLead').addEventListener('click', ()=>{ globalLeadOff=!globalLeadOff; updateMasterStatus(); });
     document.getElementById('masterMark').addEventListener('click', ()=>{ simulators.forEach(sim=>sim.markEvent()); });
-    document.getElementById('connectFitbit').addEventListener('click', ()=>{ window.location.href = AETHER_SENSE_URL + '/fitbit/login'; });
+
     updateMasterStatus();
   });
-
-  function updateFitbitVisuals(hrvData) {
-    // The Fitbit HRV card is the third .ecg-card (index 2)
-    const ecgCards = document.querySelectorAll('.ecg-card');
-    let fitbitIndex = -1;
-    ecgCards.forEach((card, idx) => {
-      if (card.id === 'fitbit-hrv-card') fitbitIndex = idx;
-    });
-    if (fitbitIndex === -1) {
-      return;
-    }
-    const fitbitHrvSimulator = simulators[fitbitIndex];
-    const fitbitHrvPill = document.querySelector('#fitbit-hrv-card .severityPill');
-    
-    if (fitbitHrvSimulator && hrvData.length > 0) {
-      const latestHrv = hrvData[hrvData.length - 1].hrv_value;
-      if (fitbitHrvPill) {
-        fitbitHrvPill.textContent = `FITBIT HRV: ${latestHrv.toFixed(0)} ms`;
-      }
-      const normalizedValue = latestHrv / 100.0;
-      if (typeof fitbitHrvSimulator.pushSample === 'function') {
-        fitbitHrvSimulator.pushSample(normalizedValue);
-      }
-    }
-  }
-
 })(); 
